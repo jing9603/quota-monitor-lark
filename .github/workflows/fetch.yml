@@ -37,17 +37,9 @@ jobs:
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
         run: python ci_run.py
 
-      - name: Commit updated data
-        continue-on-error: true
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/quota.json data/last_update.json data/run.log data/feishu_subs.json data/feishu_subs_log.json data/notify_template.json data/notify_log.json state.json notify_log.json 2>/dev/null || true
-          if ! git diff --staged --quiet; then
-            git commit -m "🔄 Update quota data" && (git pull --rebase && git push || git push --force-with-lease) || echo "Push failed (non-critical)"
-          else
-            echo "No changes to commit"
-          fi
+      # 「Commit updated data」步骤已移除：ci_run.py 的 _save_state_remote()
+      # 已经通过 GitHub API 直接写回 state.json（这是跨轮次变化检测唯一依赖的文件），
+      # 再 git push 一次只是重复提交。data/quota.json 等仅供看板使用，本部署不需要。
 
       # Pages 部署步骤已移除：本 fork 仅用于个人 Lark 私聊提醒，不需要看板。
       # 如需恢复看板，先在仓库 Settings → Pages 选择 "GitHub Actions" 作为来源，

@@ -36,7 +36,14 @@ RUN_LOG = "data/run.log"
 
 
 def _append_run_log(line):
-    """通过 GitHub API 追加一行到 CI 运行日志，不依赖 git push。"""
+    """通过 GitHub API 追加一行到 CI 运行日志，不依赖 git push。
+
+    默认关闭：run.log 只用于看板的「放号规律」热力图，本部署没有看板，
+    而每轮都写一次会产生每天上千个无意义 commit。需要时设 RUN_LOG=1 开启。
+    """
+    if os.environ.get("RUN_LOG", "") != "1":
+        return
+
     import base64, time as _time
     bj_ts = _time.time() + 8 * 3600
     ts = _time.strftime("%Y-%m-%d %H:%M:%S BJT", _time.gmtime(bj_ts))
