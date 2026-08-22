@@ -299,7 +299,7 @@ def main():
                         dm_lines.append(f"  • {date}  {office_name}({office})")
                     if len(dm_lines) == 1:
                         continue  # no matching changes for this user
-                    dm_lines.append(f"\n📋 [预约办理]({BOOKING_URL}) ｜ 📊 [实时看板]({DASHBOARD_URL})")
+                    dm_lines.append(f"\n📋 [立即预约]({BOOKING_URL}) ｜ 🪧 [配额查询]({QUOTA_URL})")
                     dms_to_send.append((open_id, "\n".join(dm_lines)))
 
                 dm_sent = 0
@@ -347,8 +347,9 @@ def main():
 
 # ─── URL Constants (used by DM) ───────────────────────────────────
 
-DASHBOARD_URL = "https://jing9603.github.io/quota-monitor"
+# 本部署没有看板（未启用 Pages），所以私聊只给真正有用的两个官方链接。
 BOOKING_URL = "https://www.gov.hk/sc/apps/immdicbooking2.htm"
+QUOTA_URL = "https://eservices.es2.immd.gov.hk/es/quota-enquiry-client/?l=zh-CN&appId=579"
 
 
 if __name__ == "__main__":

@@ -195,9 +195,12 @@ def _load_template():
             wrapper = json.load(f)
         if wrapper and isinstance(wrapper, dict) and wrapper.get("enc"):
             from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-            key = base64.b64decode(
-                os.environ.get("ENCRYPTION_KEY",
-                               "MC31nrort3V69A/EloZj9TXVAeNdB2zO2dh0ZNvEfk0="))
+            # 不设硬编码兜底密钥：密钥缺失时应当放弃自定义模板、回退到默认文案，
+            # 而不是拿一个写死在源码里的密钥去解密。
+            env_key = os.environ.get("ENCRYPTION_KEY", "")
+            if not env_key:
+                return None
+            key = base64.b64decode(env_key)
             aes = AESGCM(key)
             raw = base64.b64decode(wrapper["data"])
             iv, ct = raw[:12], raw[12:]
