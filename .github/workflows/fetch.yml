@@ -1,0 +1,54 @@
+name: Fetch Quota & Notify
+# 每 2 分钟自动抓取配额并通知
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [fetch-quota]
+  # 兜底：万一 cron-job.org 静默失效，GitHub 自带 cron 仍保证每 15 分钟跑一次。
+  # 注意 GitHub cron 用 UTC，且高负载时可能延迟甚至跳过，所以只作为备份而非主力。
+  schedule:
+    - cron: '*/15 * * * *'
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests cryptography
+
+      - name: Fetch quota & notify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_CHAT_ID: ${{ secrets.FEISHU_CHAT_ID }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        run: python ci_run.py
+
+      - name: Commit updated data
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/quota.json data/last_update.json data/run.log data/feishu_subs.json data/feishu_subs_log.json data/notify_template.json data/notify_log.json state.json notify_log.json 2>/dev/null || true
+          if ! git diff --staged --quiet; then
+            git commit -m "🔄 Update quota data" && (git pull --rebase && git push || git push --force-with-lease) || echo "Push failed (non-critical)"
+          else
+            echo "No changes to commit"
+          fi
+
+      # Pages 部署步骤已移除：本 fork 仅用于个人 Lark 私聊提醒，不需要看板。
+      # 如需恢复看板，先在仓库 Settings → Pages 选择 "GitHub Actions" 作为来源，
+      # 再从上游 fetch.yml 恢复 configure-pages / upload-pages-artifact / deploy-pages 步骤。

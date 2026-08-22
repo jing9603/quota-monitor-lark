@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台 · quota-monitor</title>
+<style>
+:root {
+  --bg: #fff; --bg2: #f8f9fa; --text: #1a1a2e; --text2: #6b7280;
+  --border: #e5e7eb; --green: #16a34a; --red: #dc2626; --accent: #2563eb;
+  --radius: 8px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f172a; --bg2: #1e293b; --text: #f1f5f9; --text2: #94a3b8; --border: #334155; }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); display: flex; justify-content: center; min-height: 100vh; padding: 20px; }
+.container { width: 100%; max-width: 860px; }
+h1 { font-size: 1.25rem; margin-bottom: 4px; }
+.sub { font-size: 0.82rem; color: var(--text2); margin-bottom: 16px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 2px; margin-bottom: 16px; border-bottom: 2px solid var(--border); }
+.tab { padding: 8px 16px; border: none; background: none; font-size: 0.85rem; font-weight: 600; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; font-family: var(--font); }
+.tab:hover { color: var(--text); }
+.tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Cards */
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.card-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 12px; }
+.kpi-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.kpi { flex: 1; min-width: 120px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; text-align: center; }
+.kpi .kv { font-size: 1.8rem; font-weight: 800; color: var(--accent); }
+.kpi .kl { font-size: 0.75rem; color: var(--text2); margin-top: 2px; }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th { text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border); font-weight: 700; font-size: 0.78rem; color: var(--text2); }
+td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.mono { font-family: "SF Mono", "Cascadia Code", Consolas, monospace; font-size: 0.8rem; }
+.date-list { font-size: 0.78rem; color: var(--text2); max-width: 260px; word-break: break-all; }
+
+/* Controls */
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+input, textarea { padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); font-size: 0.88rem; font-family: var(--font); }
+input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+textarea { width: 100%; min-height: 120px; resize: vertical; margin-bottom: 8px; }
+.btn { display: inline-block; padding: 8px 18px; border: none; border-radius: var(--radius); font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: var(--font); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+.btn-sm { padding: 4px 12px; font-size: 0.78rem; }
+.btn:hover { opacity: 0.85; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.search { width: 220px; }
+.msg { margin-top: 8px; font-size: 0.84rem; }
+.msg.ok { color: var(--green); }
+.msg.err { color: var(--red); }
+.hidden { display: none !important; }
+.refresh { font-size: 0.82rem; color: var(--text2); margin-left: 8px; }
+
+/* Login */
+.login-box { text-align: center; margin-top: 60px; }
+.login-box .card { max-width: 360px; margin: 0 auto; }
+label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; text-align: left; }
+input[type="password"] { width: 100%; margin-bottom: 12px; }
+
+.detail-row { cursor: pointer; }
+.detail-row:hover { background: var(--bg); }
+.detail-body td { padding: 6px 10px 10px 30px; color: var(--text2); font-size: 0.82rem; background: var(--bg); }
+
+.logout { font-size: 0.78rem; color: var(--text2); margin-top: 4px; cursor: pointer; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- Login -->
+  <div id="loginView" class="login-box">
+    <h1>📢 管理后台</h1>
+    <p class="sub">quota-monitor</p>
+    <div class="card">
+      <label>🔐 管理密码</label>
+      <input type="password" id="pwdInput" placeholder="输入密码...">
+      <button class="btn btn-primary" id="loginBtn" style="width:100%">验证</button>
+      <div id="loginMsg" class="msg hidden"></div>
+    </div>
+  </div>
+
+  <!-- Main (hidden until login) -->
+  <div id="mainView" class="hidden">
+    <h1>📢 管理后台</h1>
+    <p class="sub">quota-monitor · <span class="logout" id="logoutBtn">退出</span></p>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab on" data-tab="overview">📊 概览</button>
+      <button class="tab" data-tab="dm">💬 DM 订阅</button>
+      <button class="tab" data-tab="send">📢 群发</button>
+      <button class="tab" data-tab="tpl">📝 模板</button>
+    </div>
+
+    <!-- 📊 Overview -->
+    <div id="tab-overview">
+      <div class="kpi-row" id="kpiRow">
+        <div class="kpi"><div class="kv" id="kpiDmActive">-</div><div class="kl">DM 活跃订阅</div></div>
+        <div class="kpi"><div class="kv" id="kpiDmAll">-</div><div class="kl">全部日期 / 特定日期</div></div>
+        <div class="kpi"><div class="kv" id="kpiDmDaily">-</div><div class="kl">今日 DM 新增（新人）/ 退订（主动）</div></div>
+        <div class="kpi"><div class="kv" id="kpiDmEver">-</div><div class="kl">历史累计 DM</div></div>
+      </div>
+    </div>
+
+    <!-- 💬 DM -->
+    <div id="tab-dm" class="hidden">
+      <div class="card">
+        <div class="toolbar">
+          <input class="search" id="dmSearch" placeholder="🔍 搜索 open_id..." oninput="filterDm()">
+          <span style="font-size:0.82rem;color:var(--text2)">共 <strong id="dmCount">0</strong> 人</span>
+        </div>
+        <div style="max-height:420px;overflow-y:auto">
+        <table><tbody id="dmTable"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 📢 Send -->
+    <div id="tab-send" class="hidden">
+      <div class="card">
+        <div class="card-title">📝 消息编辑</div>
+        <textarea id="msgInput" placeholder="输入 Markdown 消息...&#10;&#10;**粗体** [链接](https://...)&#10;📊 看板: https://Zheyi-D.github.io/quota-monitor"></textarea>
+        <div class="toolbar">
+          <button class="btn btn-primary" id="sendGroupBtn">🔔 发送到群</button>
+          <button class="btn btn-ghost" id="sendDmBtn">💬 私聊群发</button>
+          <span style="font-size:0.78rem;color:var(--text2)">（私聊群发有 0.5s/人 间隔，请耐心等待）</span>
+        </div>
+        <div id="sendMsg" class="msg hidden"></div>
+      </div>
+    </div>
+
+    <!-- 📝 Template -->
+    <div id="tab-tpl" class="hidden">
+      <div class="card">
+        <div class="card-title">📝 通知模板</div>
+        <p style="font-size:0.8rem;color:var(--text2);margin-bottom:12px">修改飞书群通知消息的格式。可用占位符：<code v-pre>{{time}}</code> <code v-pre>{{date}}</code> <code v-pre>{{office_name}}</code> <code v-pre>{{office}}</code> <code v-pre>{{qtype_name}}</code> <code v-pre>{{status_name}}</code> <code v-pre>{{dashboard_url}}</code> <code v-pre>{{booking_url}}</code> <code v-pre>{{quota_url}}</code> <code v-pre>{{group_url}}</code></p>
+
+        <label>📌 标题区域</label>
+        <textarea id="tplHeader" rows="3" placeholder="放号通知的标题部分..."></textarea>
+
+        <label>📋 每行格式</label>
+        <input id="tplItem" placeholder="  • {{date}}  {{office_name}}({{office}})  {{qtype_name}} → {{status_name}}">
+
+        <label>🔗 底部区域（链接 + 免责声明）</label>
+        <textarea id="tplFooter" rows="6" placeholder="放号通知的底部部分..."></textarea>
+
+        <label>🔗 链接配置</label>
+        <div class="tpl-links" id="tplLinks"></div>
+
+        <div class="toolbar" style="margin-top:12px">
+          <button class="btn btn-primary" id="saveTplBtn">💾 保存模板</button>
+          <button class="btn btn-ghost" id="resetTplBtn">🔄 恢复默认</button>
+          <span id="tplMsg" class="msg hidden"></span>
+        </div>
+
+        <details style="margin-top:16px">
+          <summary style="cursor:pointer;font-size:0.85rem;font-weight:600;color:var(--text2)">📋 预览示例</summary>
+          <div class="preview" id="tplPreview" style="margin-top:8px;font-size:0.82rem;line-height:1.7;white-space:pre-wrap;color:var(--text)"></div>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WORKER = "https://quota-monitor.deng-zheyi.workers.dev";
+const AUTH_KEY = "qm_admin_auth2";
+
+let token = "";
+let dmList = [];
+
+// ── Login ────────────────────────────────────────────
+const loginView = document.getElementById("loginView");
+const mainView = document.getElementById("mainView");
+const pwdInput = document.getElementById("pwdInput");
+const loginBtn = document.getElementById("loginBtn");
+const loginMsg = document.getElementById("loginMsg");
+
+function checkAuth() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(AUTH_KEY) || "{}");
+    if (stored.token && stored.exp && Date.now() < stored.exp) {
+      token = stored.token;
+      showMain();
+      return;
+    }
+  } catch {}
+  pwdInput.focus();
+}
+
+async function doLogin() {
+  const pw = pwdInput.value;
+  if (!pw) return showLMsg("请输入密码", false);
+  loginBtn.disabled = true;
+  try {
+    const resp = await fetch(`${WORKER}/api/admin/login`, {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ password: pw }),
+    });
+    const data = await resp.json();
+    if (resp.ok && data.token) {
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ token: data.token, exp: Date.now() + data.expires_in * 1000 }));
+      token = data.token;
+      showLMsg("✅ ok", true);
+      showMain();
+    } else {
+      showLMsg("❌ 密码错误", false);
+    }
+  } catch { showLMsg("❌ 网络错误", false); }
+  loginBtn.disabled = false;
+}
+function showLMsg(t, ok) { loginMsg.textContent = t; loginMsg.className = "msg " + (ok ? "ok" : "err"); loginMsg.classList.remove("hidden"); }
+loginBtn.addEventListener("click", doLogin);
+pwdInput.addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  localStorage.removeItem(AUTH_KEY);
+  token = "";
+  mainView.classList.add("hidden");
+  loginView.classList.remove("hidden");
+  pwdInput.value = "";
+  pwdInput.focus();
+});
+
+// ── Tabs ──────────────────────────────────────────────
+let currentTab = "overview";
+document.querySelectorAll(".tab").forEach(t => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
+    t.classList.add("on");
+    switchTab(t.dataset.tab);
+  });
+});
+
+function switchTab(name) {
+  currentTab = name;
+  ["overview","dm","send","tpl"].forEach(n => document.getElementById("tab-"+n).classList.toggle("hidden", n !== name));
+  if (name === "overview") loadStats();
+  if (name === "dm" && dmList.length === 0) loadDm();
+  if (name === "tpl") loadTemplate();
+}
+
+// ── Data loading ──────────────────────────────────────
+function handle401() {
+  localStorage.removeItem(AUTH_KEY);
+  token = "";
+  mainView.classList.add("hidden");
+  loginView.classList.remove("hidden");
+  pwdInput.value = "";
+  pwdInput.focus();
+  showLMsg("登录已过期，请重新输入密码", false);
+}
+
+async function post(path, body, method) {
+  const resp = await fetch(`${WORKER}${path}`, {
+    method: method || "POST",
+    headers: {"Content-Type":"application/json", "Authorization": `Bearer ${token}`},
+    body: body && method !== "GET" ? JSON.stringify(body) : undefined,
+  });
+  if (resp.status === 401) { handle401(); return {ok:false}; }
+  return resp.json();
+}
+
+async function loadStats() {
+  const data = await post("/api/admin/stats", {});
+  if (!data.ok) return;
+  document.getElementById("kpiDmActive").textContent = data.dm_active;
+  document.getElementById("kpiDmAll").textContent = data.dm_all + " / " + data.dm_pick;
+  document.getElementById("kpiDmDaily").textContent = "+" + data.dm_daily_new + "（新人）/ -" + data.dm_daily_unsub + "（主动退订）";
+  document.getElementById("kpiDmEver").textContent = data.dm_ever;
+}
+
+async function loadDm() {
+  const data = await post("/api/admin/dm-subscribers", {});
+  if (!data.ok) return;
+  dmList = data.subscribers || [];
+  renderDmTable();
+}
+
+// ── DM table ──────────────────────────────────────────
+let dmExpanded = {};
+function renderDmTable(filter) {
+  const list = filter ? dmList.filter(s => s.open_id.includes(filter)) : dmList;
+  document.getElementById("dmCount").textContent = dmList.length;
+  const tbody = document.getElementById("dmTable");
+  if (list.length === 0) { tbody.innerHTML = '<tr><td style="text-align:center;color:var(--text2);padding:24px">无数据</td></tr>'; return; }
+
+  const OFFICES = {FTO:"火炭",RHK:"港岛",RKO:"九龙",RTK:"将军澳",TMO:"屯门",YLO:"元朗"};
+
+  tbody.innerHTML = list.map(s => {
+    const shortId = s.open_id.slice(0, 14) + "…" + s.open_id.slice(-4);
+    const dateMode = (!s.dates || s.dates.length === 0) ? '全部' : s.dates.length + '个';
+    const officeMode = (!s.offices || s.offices.length === 0) ? '全部' : s.offices.map(c => OFFICES[c]||c).join('、');
+    const subTime = s.subscribed_at ? s.subscribed_at.slice(0, 10) : "?";
+    const expanded = dmExpanded[s.open_id];
+    let detail = "";
+    if (expanded) {
+      const parts = [];
+      if (s.dates && s.dates.length > 0) {
+        const short = s.dates.slice(0, 20).map(d => { const [m,d2] = d.split("/"); return parseInt(m)+"/"+parseInt(d2); }).join("、");
+        const more = s.dates.length > 20 ? ` …+${s.dates.length-20}` : "";
+        parts.push("📅 " + short + more);
+      }
+      if (s.offices && s.offices.length > 0) {
+        parts.push("🏢 " + s.offices.map(c => OFFICES[c]||c).join('、'));
+      }
+      if (parts.length > 0) detail = parts.join(" ｜ ");
+    }
+    return `<tr class="detail-row" onclick="toggleDm('${s.open_id}')" title="点击展开/收起">
+      <td style="width:20px">${expanded ? '▼' : '▶'}</td>
+      <td class="mono">${shortId}</td>
+      <td style="font-size:0.82rem">📅 ${dateMode}</td>
+      <td style="font-size:0.82rem">🏢 ${officeMode}</td>
+      <td style="color:var(--text2)">${subTime}</td>
+      <td style="text-align:right"><button class="btn btn-danger btn-sm" onclick="event.stopPropagation();delDm('${s.open_id}')">删除</button></td>
+    </tr>
+    ${expanded && detail ? `<tr class="detail-body"><td colspan="6">${esc(detail)}</td></tr>` : ""}`;
+  }).join("");
+}
+function toggleDm(oid) { dmExpanded[oid] = !dmExpanded[oid]; renderDmTable(); }
+function filterDm() { renderDmTable(document.getElementById("dmSearch").value); }
+
+async function delDm(oid) {
+  const sub = dmList.find(s => s.open_id === oid);
+  if (!confirm(`确定删除 ${sub ? oid.slice(0,14)+'…' : oid}？`)) return;
+  const resp = await post("/api/feishu-unsubscribe", { open_id: oid });
+  if (resp.ok) {
+    dmList = dmList.filter(s => s.open_id !== oid);
+    renderDmTable();
+  } else { alert(resp.msg || "删除失败"); }
+}
+
+// ── Send ──────────────────────────────────────────────
+const sendMsg = document.getElementById("sendMsg");
+function showSend(t, ok) { sendMsg.textContent = t; sendMsg.className = "msg " + (ok ? "ok" : "err"); sendMsg.classList.remove("hidden"); }
+
+document.getElementById("sendGroupBtn").addEventListener("click", async () => {
+  const text = document.getElementById("msgInput").value.trim();
+  if (!text) return showSend("请输入消息", false);
+  if (text.length > 4000) return showSend("超过4000字", false);
+
+  showSend("发送中...", true);
+  try {
+    const resp = await fetch(`${WORKER}/api/admin-send`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json", "Authorization": `Bearer ${token}`},
+      body: JSON.stringify({ text }),
+    });
+    if (resp.status === 401) { handle401(); return; }
+    const data = await resp.json();
+    showSend(data.ok ? `✅ ${data.msg || '已发送'}` : `❌ ${data.msg}`, data.ok);
+  } catch { showSend("❌ 网络错误", false); }
+});
+
+document.getElementById("sendDmBtn").addEventListener("click", async () => {
+  const text = document.getElementById("msgInput").value.trim();
+  if (!text) return showSend("请输入消息", false);
+  if (text.length > 4000) return showSend("超过4000字", false);
+  if (!confirm(`确认私聊群发给 ${dmList.length} 人？`)) return;
+
+  showSend(`发送中（${dmList.length} 人，约 ${Math.round(dmList.length*0.5)} 秒）...`, true);
+  document.getElementById("sendDmBtn").disabled = true;
+  try {
+    const data = await post("/api/admin/dm-send", { text });
+    showSend(data.ok ? `✅ 成功 ${data.sent}/${dmList.length} 人` : `❌ ${data.msg}`, data.ok);
+  } catch { showSend("❌ 网络错误", false); }
+  document.getElementById("sendDmBtn").disabled = false;
+});
+
+// ── Template ───────────────────────────────────────────
+const DEFAULT_TPL = {
+  header: "📅 检测时间（北京时间）：{{time}}\n\n🟢 **新放出名额！**\n",
+  item: "  • {{date}}  {{office_name}}({{office}})  {{qtype_name}} → {{status_name}}",
+  footer: "\n——————————————————————————————\n📊 实时看板：{{dashboard_url}}\n📋 预约办理：{{booking_url}}\n🪧 配额查询：{{quota_url}}\n📖 加群方式：{{group_url}}\n\n⚠️ 本系统为第三方开源工具，非香港入境事务处官方服务。请以官网信息为准。\n   仅供学习交流，请勿用于商业盈利目的。",
+  links: {
+    dashboard_url: "https://Zheyi-D.github.io/quota-monitor",
+    booking_url: "https://www.gov.hk/sc/apps/immdicbooking2.htm",
+    quota_url: "https://eservices.es2.immd.gov.hk/es/quota-enquiry-client/?l=zh-CN&appId=579",
+    group_url: "https://scn7uo58gnuo.feishu.cn/wiki/QSFlwcMBmil7sGkZRBTcAWqwnCf",
+  }
+};
+
+async function loadTemplate() {
+  const data = await post("/api/admin/template", null, "GET");
+  const tpl = (data.ok && data.template) ? data.template : DEFAULT_TPL;
+  document.getElementById("tplHeader").value = tpl.header || "";
+  document.getElementById("tplItem").value = tpl.item || "";
+  document.getElementById("tplFooter").value = tpl.footer || "";
+  const links = tpl.links || DEFAULT_TPL.links;
+  const linksDiv = document.getElementById("tplLinks");
+  const defaults = DEFAULT_TPL.links;
+  linksDiv.innerHTML = Object.keys(defaults).map(k =>
+    `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <code style="width:120px;font-size:0.78rem;text-align:right" v-pre>{{${k}}}</code>
+      <input class="tpl-link" data-key="${k}" value="${esc((links[k]||defaults[k]||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;'))}" style="flex:1;margin:0" placeholder="${defaults[k]}">
+    </div>`
+  ).join("");
+  renderPreview();
+}
+
+function getCurrentTpl() {
+  const links = {};
+  document.querySelectorAll(".tpl-link").forEach(el => { links[el.dataset.key] = el.value; });
+  return {
+    header: document.getElementById("tplHeader").value,
+    item: document.getElementById("tplItem").value,
+    footer: document.getElementById("tplFooter").value,
+    links,
+  };
+}
+
+function renderPreview() {
+  const tpl = getCurrentTpl();
+  const links = tpl.links || {};
+  const repl = (s) => {
+    return s
+      .replace(/\{\{time\}\}/g, "2026-08-02 14:18:32")
+      .replace(/\{\{date\}\}/g, "09/09/2026")
+      .replace(/\{\{office_name\}\}/g, "港岛办事处")
+      .replace(/\{\{office\}\}/g, "RHK")
+      .replace(/\{\{qtype_name\}\}/g, "一般服务时段")
+      .replace(/\{\{status_name\}\}/g, "少量 🟡")
+      .replace(/\{\{(\w+)\}\}/g, (_, k) => links[k] || `{{${k}}}`);
+  };
+  const preview = repl(tpl.header) + repl(tpl.item) + repl(tpl.footer);
+  document.getElementById("tplPreview").textContent = preview;
+}
+
+document.getElementById("saveTplBtn").addEventListener("click", async () => {
+  const tpl = getCurrentTpl();
+  const data = await post("/api/admin/template", { template: tpl });
+  showTplMsg(data.ok ? "✅ 已保存" : "❌ " + (data.msg||"失败"), data.ok);
+});
+
+document.getElementById("resetTplBtn").addEventListener("click", () => {
+  if (!confirm("恢复默认模板？当前修改将丢失。")) return;
+  document.getElementById("tplHeader").value = DEFAULT_TPL.header;
+  document.getElementById("tplItem").value = DEFAULT_TPL.item;
+  document.getElementById("tplFooter").value = DEFAULT_TPL.footer;
+  document.querySelectorAll(".tpl-link").forEach(el => { el.value = DEFAULT_TPL.links[el.dataset.key] || ""; });
+  renderPreview();
+  showTplMsg("已恢复默认（需点保存）", true);
+});
+
+function showTplMsg(t, ok) {
+  const el = document.getElementById("tplMsg");
+  el.textContent = t; el.className = "msg " + (ok ? "ok" : "err"); el.classList.remove("hidden");
+  setTimeout(() => el.classList.add("hidden"), 4000);
+}
+
+// Auto-preview on input
+document.getElementById("tplHeader").addEventListener("input", renderPreview);
+document.getElementById("tplItem").addEventListener("input", renderPreview);
+document.getElementById("tplFooter").addEventListener("input", renderPreview);
+document.addEventListener("input", e => { if (e.target.classList.contains("tpl-link")) renderPreview(); });
+
+// ── Init ──────────────────────────────────────────────
+function showMain() {
+  loginView.classList.add("hidden");
+  mainView.classList.remove("hidden");
+  loadStats();
+}
+function esc(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+checkAuth();
+</script>
+</body>
+</html>

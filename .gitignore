@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Runtime
+*.log
+*.log.*
+
+# Config (contains secrets)
+config.json
+.env
+*.env
+.env.*
+
+# Node
+node_modules/
+
+# Test
+_test_*.py
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
