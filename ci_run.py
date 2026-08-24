@@ -302,7 +302,7 @@ def main():
 
     # ── 1. 拉取 API ──
     logger.info("拉取配额数据...")
-    snapshot = fetch_snapshot()
+    snapshot = fetch_snapshot(date_end=DATE_END)
     if not snapshot:
         logger.error("无法获取配额数据，退出")
         sys.exit(1)
@@ -327,7 +327,7 @@ def main():
     changes = detect_changes(old_snapshot, snapshot)
 
     # ── 4. 发送通知 ──
-    notify_result = {"feishu": None, "feishu_dm": 0}
+    notify_result = {"feishu": None}
     if is_first_run:
         logger.info("首次运行，基准快照已建立，不发送通知")
         _append_run_log("INIT | 首次运行，基准快照已建立")
@@ -367,59 +367,10 @@ def main():
             else:
                 logger.info("飞书群聊通知: skipped (未配置 FEISHU_CHAT_ID 或 FEISHU_WEBHOOK_URL)")
 
-        # Feishu DM 按日期过滤通知（在邮件之前，避免被慢速SMTP阻塞）
-        if not (app_id and app_secret):
-            logger.info("飞书 DM 通知: skipped (FEISHU_APP_ID/FEISHU_APP_SECRET 未配置)")
-        else:
-            feishu_subs = _load_json_encrypted("data/feishu_subs.json")
-            if not feishu_subs:
-                logger.info("飞书 DM 通知: skipped (data/feishu_subs.json 为空或无法解密)")
-            elif isinstance(feishu_subs, list) and feishu_subs:
-                released_dates = {date for (date, _, _), _, _ in changes.get("newly_available", [])}
-                dms_to_send = []
-                for sub in feishu_subs:
-                    open_id = sub.get("open_id", "")
-                    user_dates = sub.get("dates") or []
-                    user_offices = sub.get("offices") or []
-                    if not open_id:
-                        continue
-                    date_match = (not user_dates or any(d in released_dates for d in user_dates))
-                    if not date_match:
-                        continue
-                    dm_lines = ["## 🔔 你关注的日期有新增配额！\n"]
-                    for (date, office, qtype), old_s, new_s in changes["newly_available"]:
-                        if user_dates and date not in user_dates:
-                            continue
-                        if user_offices and office not in user_offices:
-                            continue
-                        office_name = DEFAULT_OFFICES.get(office, office)
-                        dm_lines.append(f"  • {date}  {office_name}({office})")
-                    if len(dm_lines) == 1:
-                        continue  # no matching changes for this user
-                    dm_lines.append(f"\n📋 [立即预约]({BOOKING_URL}) ｜ 🪧 [配额查询]({QUOTA_URL})")
-                    dms_to_send.append((open_id, "\n".join(dm_lines)))
-
-                dm_sent = 0
-                if dms_to_send:
-                    def _send_one(oid, text):
-                        try:
-                            return send_feishu_dm(text, app_id, app_secret, oid)
-                        except Exception as e:
-                            logger.warning("飞书 DM 发送失败 open_id=%s: %s", oid[:16], e)
-                            return False
-                    with ThreadPoolExecutor(max_workers=min(len(dms_to_send), 5)) as pool:
-                        futures = {pool.submit(_send_one, oid, text): oid for oid, text in dms_to_send}
-                        for f in as_completed(futures):
-                            if f.result(): dm_sent += 1
-                if dm_sent > 0:
-                    logger.info("飞书 DM 通知: %d/%d", dm_sent, len(feishu_subs))
-                elif not dms_to_send:
-                    logger.info("飞书 DM 通知: skipped (%d 个订阅者，无人匹配本次变化的日期/办事处)", len(feishu_subs))
-                else:
-                    logger.warning("飞书 DM 通知: 0/%d 全部发送失败", len(dms_to_send))
-                notify_result["feishu_dm"] = dm_sent
-
-        # 邮件通知已下架
+        # 个人使用，单一收件人：群聊广播就是全部通知渠道，不再另外维护
+        # 一套按订阅者日期/办事处过滤的私聊路径（此前没有可用的订阅入口，
+        # 也会导致同一个人收到两条重复消息）。真正的过滤在抓取阶段的
+        # DATE_END 完成。
 
         # 写日志
         _append_notify_log({
@@ -427,7 +378,6 @@ def main():
             "event": "quota_change",
             "changes": len(changes.get("newly_available", [])),
             "feishu": notify_result["feishu"],
-            "feishu_dm": notify_result.get("feishu_dm", 0),
             "summary": f"配额变化: {len(changes.get('newly_available',[]))} 个日期"
         })
 
@@ -446,11 +396,10 @@ def main():
     logger.info("CI Run 完成")
 
 
-# ─── URL Constants (used by DM) ───────────────────────────────────
+# ─── Constants ──────────────────────────────────────────────────────
 
-# 本部署没有看板（未启用 Pages），所以私聊只给真正有用的两个官方链接。
-BOOKING_URL = "https://www.gov.hk/sc/apps/immdicbooking2.htm"
-QUOTA_URL = "https://eservices.es2.immd.gov.hk/es/quota-enquiry-client/?l=zh-CN&appId=579"
+# 只关心这个日期之前的配额，超出的一律不拉取、不报警。
+DATE_END = "09/22/2026"
 
 
 if __name__ == "__main__":
