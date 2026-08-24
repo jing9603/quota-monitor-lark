@@ -3,6 +3,12 @@ name: Fetch Quota & Notify
 
 on:
   workflow_dispatch:
+    inputs:
+      test_alert:
+        description: '发送测试消息验证通知链路（群聊+私聊），不拉取真实配额、不修改 state.json'
+        required: false
+        type: boolean
+        default: false
   repository_dispatch:
     types: [fetch-quota]
   # 兜底：万一 cron-job.org 静默失效，GitHub 自带 cron 仍保证每 15 分钟跑一次。
@@ -35,6 +41,7 @@ jobs:
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           FEISHU_CHAT_ID: ${{ secrets.FEISHU_CHAT_ID }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          TEST_ALERT: ${{ (github.event_name == 'workflow_dispatch' && inputs.test_alert) && '1' || '' }}
         run: python ci_run.py
 
       # 「Commit updated data」步骤已移除：ci_run.py 的 _save_state_remote()

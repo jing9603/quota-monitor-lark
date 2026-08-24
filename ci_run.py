@@ -208,8 +208,62 @@ def _append_notify_log(entry):
         json.dump(logs, f, ensure_ascii=False, indent=2)
 
 
+def _run_test_alert():
+    """手动触发的通知链路验证：发送一条明确标记的测试消息到群聊 + 所有 DM 订阅者。
+
+    不拉取真实配额、不修改 state.json / run.log，只验证 Feishu 凭据和收件人是否可达。
+    通过 workflow_dispatch 的 test_alert 输入触发。
+    """
+    import time as _time
+    bj_ts = _time.time() + 8 * 3600
+    now = _time.strftime("%Y-%m-%d %H:%M:%S", _time.gmtime(bj_ts))
+    test_message = (
+        f"🧪 **通知链路测试消息**\n\n"
+        f"发送时间（北京时间）：{now}\n\n"
+        f"如果你在飞书收到这条消息，说明配额监控的通知链路工作正常。\n"
+        f"⚠️ 这不代表真实配额变化，请勿据此预约。"
+    )
+    logger.info("=== TEST 模式：仅验证通知链路，不拉取真实配额、不修改 state.json ===")
+
+    app_id = os.environ.get("FEISHU_APP_ID", "")
+    app_secret = os.environ.get("FEISHU_APP_SECRET", "")
+    chat_ids_raw = os.environ.get("FEISHU_CHAT_ID", "")
+
+    if app_id and app_secret and chat_ids_raw:
+        chat_ids = [c.strip() for c in chat_ids_raw.split(",") if c.strip()]
+        ok_all = True
+        for cid in chat_ids:
+            if not send_feishu_api(test_message, app_id, app_secret, cid, title="🧪 通知链路测试"):
+                ok_all = False
+        logger.info("[TEST] 群聊测试消息: %s (%d群)", "OK" if ok_all else "PARTIAL/FAIL", len(chat_ids))
+    elif not (app_id and app_secret):
+        logger.info("[TEST] 群聊测试消息: skipped (FEISHU_APP_ID/FEISHU_APP_SECRET 未配置)")
+    else:
+        logger.info("[TEST] 群聊测试消息: skipped (FEISHU_CHAT_ID 未配置)")
+
+    if app_id and app_secret:
+        feishu_subs = _load_json_encrypted("data/feishu_subs.json")
+        if feishu_subs and isinstance(feishu_subs, list) and feishu_subs:
+            sent = 0
+            for sub in feishu_subs:
+                open_id = sub.get("open_id", "")
+                if open_id and send_feishu_dm(test_message, app_id, app_secret, open_id, title="🧪 通知链路测试"):
+                    sent += 1
+            logger.info("[TEST] 私聊测试消息: %d/%d", sent, len(feishu_subs))
+        else:
+            logger.info("[TEST] 私聊测试消息: skipped (无订阅者或 feishu_subs.json 为空/无法解密)")
+    else:
+        logger.info("[TEST] 私聊测试消息: skipped (FEISHU_APP_ID/FEISHU_APP_SECRET 未配置)")
+
+    logger.info("=== TEST 完成 ===")
+
+
 def main():
     logger.info("CI Run — %s", datetime.now().isoformat())
+
+    if os.environ.get("TEST_ALERT", "") == "1":
+        _run_test_alert()
+        return
 
     # ── 1. 拉取 API ──
     logger.info("拉取配额数据...")
