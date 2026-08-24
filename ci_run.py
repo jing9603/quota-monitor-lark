@@ -268,6 +268,17 @@ def _run_test_alert():
 
     if app_id and app_secret:
         if sub_list:
+            for sub in sub_list:
+                dates = sub.get("dates") or []
+                offices = sub.get("offices") or []
+                logger.info(
+                    "[TEST] 订阅者 %s: dates=%d个%s offices=%s subscribed_at=%s",
+                    (sub.get("open_id", "") or "")[:12],
+                    len(dates),
+                    (" (" + ", ".join(dates[:5]) + (", ..." if len(dates) > 5 else "") + ")") if dates else " (全部日期)",
+                    offices or "全部办事处",
+                    sub.get("subscribed_at", "未知"),
+                )
             sent = 0
             for sub in sub_list:
                 open_id = sub.get("open_id", "")
