@@ -252,10 +252,8 @@ def format_changes(changes, offices=None):
     default_item = "  • {{date}}  {{office_name}}({{office}})  {{qtype_name}} → {{status_name}}"
     default_footer = (
         "\n——————————————————————————————\n"
-        "📊 实时看板：{{dashboard_url}}\n"
         "📋 预约办理：{{booking_url}}\n"
         "🪧 配额查询：{{quota_url}}\n"
-        "📖 加群方式：{{group_url}}\n"
         "\n⚠️ 本系统为第三方开源工具，非香港入境事务处官方服务。请以官网信息为准。\n"
         "   仅供学习交流，请勿用于商业盈利目的。"
     )
