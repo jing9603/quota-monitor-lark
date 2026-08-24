@@ -273,11 +273,19 @@ def main():
             logger.info("飞书通知: %s", notify_result["feishu"])
         else:
             notify_result["feishu"] = "skipped"
+            if not (app_id and app_secret):
+                logger.info("飞书群聊通知: skipped (FEISHU_APP_ID/FEISHU_APP_SECRET 未配置)")
+            else:
+                logger.info("飞书群聊通知: skipped (未配置 FEISHU_CHAT_ID 或 FEISHU_WEBHOOK_URL)")
 
         # Feishu DM 按日期过滤通知（在邮件之前，避免被慢速SMTP阻塞）
-        if app_id and app_secret:
+        if not (app_id and app_secret):
+            logger.info("飞书 DM 通知: skipped (FEISHU_APP_ID/FEISHU_APP_SECRET 未配置)")
+        else:
             feishu_subs = _load_json_encrypted("data/feishu_subs.json")
-            if feishu_subs and isinstance(feishu_subs, list) and feishu_subs:
+            if not feishu_subs:
+                logger.info("飞书 DM 通知: skipped (data/feishu_subs.json 为空或无法解密)")
+            elif isinstance(feishu_subs, list) and feishu_subs:
                 released_dates = {date for (date, _, _), _, _ in changes.get("newly_available", [])}
                 dms_to_send = []
                 for sub in feishu_subs:
@@ -316,6 +324,10 @@ def main():
                             if f.result(): dm_sent += 1
                 if dm_sent > 0:
                     logger.info("飞书 DM 通知: %d/%d", dm_sent, len(feishu_subs))
+                elif not dms_to_send:
+                    logger.info("飞书 DM 通知: skipped (%d 个订阅者，无人匹配本次变化的日期/办事处)", len(feishu_subs))
+                else:
+                    logger.warning("飞书 DM 通知: 0/%d 全部发送失败", len(dms_to_send))
                 notify_result["feishu_dm"] = dm_sent
 
         # 邮件通知已下架
