@@ -217,39 +217,63 @@ def _run_test_alert():
     import time as _time
     bj_ts = _time.time() + 8 * 3600
     now = _time.strftime("%Y-%m-%d %H:%M:%S", _time.gmtime(bj_ts))
-    test_message = (
-        f"🧪 **通知链路测试消息**\n\n"
-        f"发送时间（北京时间）：{now}\n\n"
-        f"如果你在飞书收到这条消息，说明配额监控的通知链路工作正常。\n"
-        f"⚠️ 这不代表真实配额变化，请勿据此预约。"
-    )
     logger.info("=== TEST 模式：仅验证通知链路，不拉取真实配额、不修改 state.json ===")
 
     app_id = os.environ.get("FEISHU_APP_ID", "")
     app_secret = os.environ.get("FEISHU_APP_SECRET", "")
     chat_ids_raw = os.environ.get("FEISHU_CHAT_ID", "")
+    chat_ids = [c.strip() for c in chat_ids_raw.split(",") if c.strip()]
 
-    if app_id and app_secret and chat_ids_raw:
-        chat_ids = [c.strip() for c in chat_ids_raw.split(",") if c.strip()]
+    feishu_subs = _load_json_encrypted("data/feishu_subs.json") if (app_id and app_secret) else None
+    sub_list = feishu_subs if isinstance(feishu_subs, list) else []
+
+    status_block = (
+        f"**配置状态：**\n"
+        f"  • 飞书应用凭据：{'✅ 已配置' if app_id and app_secret else '❌ 未配置'}\n"
+        f"  • 群聊 chat_id：{len(chat_ids)} 个\n"
+        f"  • DM 订阅者：{len(sub_list)} 人\n"
+    )
+
+    group_message = (
+        f"🧪 **通知链路测试消息**\n\n"
+        f"发送时间（北京时间）：{now}\n\n"
+        f"{status_block}\n"
+        f"如果你收到这条消息，说明群聊广播工作正常。\n"
+        f"⚠️ 这不代表真实配额变化，请勿据此预约。"
+    )
+
+    if app_id and app_secret and chat_ids:
         ok_all = True
         for cid in chat_ids:
-            if not send_feishu_api(test_message, app_id, app_secret, cid, title="🧪 通知链路测试"):
+            if not send_feishu_api(group_message, app_id, app_secret, cid, title="🧪 通知链路测试"):
                 ok_all = False
-        logger.info("[TEST] 群聊测试消息: %s (%d群)", "OK" if ok_all else "PARTIAL/FAIL", len(chat_ids))
+        group_result = "OK" if ok_all else "PARTIAL/FAIL"
     elif not (app_id and app_secret):
-        logger.info("[TEST] 群聊测试消息: skipped (FEISHU_APP_ID/FEISHU_APP_SECRET 未配置)")
+        group_result = "skipped (FEISHU_APP_ID/FEISHU_APP_SECRET 未配置)"
     else:
-        logger.info("[TEST] 群聊测试消息: skipped (FEISHU_CHAT_ID 未配置)")
+        group_result = "skipped (FEISHU_CHAT_ID 未配置)"
+    logger.info("[TEST] 群聊测试消息: %s (%d群)", group_result, len(chat_ids))
+
+    # DM 在群聊之后发送，因此可以把群聊的实际结果一并带上，
+    # 这样用户在飞书私聊里就能看到本次测试的完整结果，不用回来问日志。
+    dm_message = (
+        f"🧪 **通知链路测试消息**\n\n"
+        f"发送时间（北京时间）：{now}\n\n"
+        f"{status_block}\n"
+        f"**本次测试结果：**\n"
+        f"  • 群聊广播：{group_result}\n\n"
+        f"如果你收到这条私聊消息，说明私聊通知链路也工作正常。\n"
+        f"⚠️ 这不代表真实配额变化，请勿据此预约。"
+    )
 
     if app_id and app_secret:
-        feishu_subs = _load_json_encrypted("data/feishu_subs.json")
-        if feishu_subs and isinstance(feishu_subs, list) and feishu_subs:
+        if sub_list:
             sent = 0
-            for sub in feishu_subs:
+            for sub in sub_list:
                 open_id = sub.get("open_id", "")
-                if open_id and send_feishu_dm(test_message, app_id, app_secret, open_id, title="🧪 通知链路测试"):
+                if open_id and send_feishu_dm(dm_message, app_id, app_secret, open_id, title="🧪 通知链路测试"):
                     sent += 1
-            logger.info("[TEST] 私聊测试消息: %d/%d", sent, len(feishu_subs))
+            logger.info("[TEST] 私聊测试消息: %d/%d", sent, len(sub_list))
         else:
             logger.info("[TEST] 私聊测试消息: skipped (无订阅者或 feishu_subs.json 为空/无法解密)")
     else:
