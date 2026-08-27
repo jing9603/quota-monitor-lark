@@ -1,18 +1,6 @@
 {
   "version": 1,
   "last_snapshot": {
-    "08/28/2026|FTO|R": "quota-r",
-    "08/28/2026|FTO|K": "no-quotaK",
-    "08/28/2026|RHK|R": "quota-r",
-    "08/28/2026|RHK|K": "no-quotaK",
-    "08/28/2026|RKO|R": "quota-r",
-    "08/28/2026|RKO|K": "no-quotaK",
-    "08/28/2026|RTK|R": "quota-r",
-    "08/28/2026|RTK|K": "no-quotaK",
-    "08/28/2026|TMO|R": "quota-r",
-    "08/28/2026|TMO|K": "no-quotaK",
-    "08/28/2026|YLO|R": "quota-r",
-    "08/28/2026|YLO|K": "no-quotaK",
     "08/29/2026|FTO|R": "quota-r",
     "08/29/2026|FTO|K": "no-quotaK",
     "08/29/2026|RHK|R": "quota-r",
@@ -266,5 +254,5 @@
     "09/22/2026|YLO|R": "quota-r",
     "09/22/2026|YLO|K": "no-quotaK"
   },
-  "last_snapshot_time": "2026-08-28T00:14:26"
+  "last_snapshot_time": "2026-08-28T00:16:27"
 }
